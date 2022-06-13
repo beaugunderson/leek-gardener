@@ -48,8 +48,6 @@ async function getRecord(leek) {
   for (const fight of history.fights) {
     updateRecord(fight, leek);
   }
-
-  return record;
 }
 
 let token;
@@ -132,6 +130,12 @@ function sleep(ms) {
 
   console.log('Getting remaining fights...');
   const fights = await remainingFights();
+
+  console.log(`${fights} remaining fights.`);
+
+  if (fights === 0) {
+    process.exit(0);
+  }
 
   const leek = LEEKS[0];
 
