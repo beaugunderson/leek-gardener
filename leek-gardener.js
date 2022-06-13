@@ -5,11 +5,11 @@ require('dotenv').config();
 const axios = require('axios');
 const { isFinite, sortBy } = require('lodash');
 
-const FARMER_ID = parseInt(process.env.FARMER_ID, 10);
-const LEEKS = process.env.LEEKS.split(',').map((leek) => parseInt(leek, 10));
-
 const { LOGIN } = process.env;
 const { PASSWORD } = process.env;
+
+let farmerId;
+let leeks;
 
 async function getHistory(leek) {
   return (await axios.get(`https://leekwars.com/api/history/get-leek-history/${leek}`)).data;
@@ -74,6 +74,11 @@ async function login() {
   });
 
   token = response.token;
+
+  const { farmer } = await get('https://leekwars.com/api/farmer/get-from-token');
+
+  farmerId = farmer.id;
+  leeks = Object.keys(farmer.leeks);
 }
 
 async function remainingFights() {
@@ -128,6 +133,8 @@ function sleep(ms) {
   console.log('Logging in...');
   await login();
 
+  console.log(`Logged in as farmer ${farmerId} with leeks ${leeks.join(', ')}.`);
+
   console.log('Getting remaining fights...');
   const fights = await remainingFights();
 
@@ -137,7 +144,7 @@ function sleep(ms) {
     process.exit(0);
   }
 
-  const leek = LEEKS[0];
+  const leek = leeks[0];
 
   console.log('Getting record...');
   await getRecord(leek);
@@ -177,9 +184,9 @@ function sleep(ms) {
 
     let us;
 
-    if (result.farmers1[FARMER_ID]) {
+    if (result.farmers1[farmerId]) {
       us = 1;
-    } else if (result.farmers2[FARMER_ID]) {
+    } else if (result.farmers2[farmerId]) {
       us = 2;
     }
 
