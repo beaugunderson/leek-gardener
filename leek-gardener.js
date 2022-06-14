@@ -21,8 +21,6 @@ program.parse();
 
 const options = program.opts();
 
-console.log({ options });
-
 let farmerId;
 let leeks;
 
@@ -155,13 +153,9 @@ function sleep(ms) {
 
   console.log('Getting remaining fights...');
   let fights = await remainingFights();
-
   console.log(`${fights} remaining fights.`);
-
-  if (process.argv[2]) {
-    fights = Math.min(fights, parseInt(process.argv[2], 10));
-    console.log(`Only using ${fights} fights.`);
-  }
+  fights = Math.min(fights, options.fights);
+  console.log(`Using ${options.fightsfights} fights.`);
 
   if (fights === 0) {
     process.exit(0);
