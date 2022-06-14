@@ -136,9 +136,14 @@ function sleep(ms) {
   console.log(`Logged in as farmer ${farmerId} with leeks ${leeks.join(', ')}.`);
 
   console.log('Getting remaining fights...');
-  const fights = await remainingFights();
+  let fights = await remainingFights();
 
   console.log(`${fights} remaining fights.`);
+
+  if (process.argv[2]) {
+    fights = Math.min(fights, parseInt(process.argv[2], 10));
+    console.log(`Only using ${fights} fights.`);
+  }
 
   if (fights === 0) {
     process.exit(0);
