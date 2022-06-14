@@ -119,9 +119,12 @@ async function startFight(leek, enemy, cookies) {
 }
 
 async function getResult(fightId) {
-  const fight = await get(`https://leekwars.com/api/fight/get/${fightId}`);
-
-  return fight;
+  try {
+    return await get(`https://leekwars.com/api/fight/get/${fightId}`);
+  } catch (e) {
+    console.error(e.message);
+    return null;
+  }
 }
 
 function sleep(ms) {
@@ -183,7 +186,9 @@ function sleep(ms) {
 
     while (!result || result.winner === -1) {
       console.log('Waiting for fight to run...');
+
       await sleep(1000);
+
       result = await getResult(fight);
     }
 
