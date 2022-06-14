@@ -4,9 +4,24 @@ require('dotenv').config();
 
 const axios = require('axios');
 const { isFinite, sortBy } = require('lodash');
+const { Option, program } = require('commander');
 
 const { LOGIN } = process.env;
 const { PASSWORD } = process.env;
+
+function parseBase10(number) {
+  return parseInt(number, 10);
+}
+
+program
+  .addOption(new Option('--leek <number>').argParser(parseBase10).default(1))
+  .addOption(new Option('--fights <number>').argParser(parseBase10).default(10));
+
+program.parse();
+
+const options = program.opts();
+
+console.log({ options });
 
 let farmerId;
 let leeks;
@@ -78,7 +93,7 @@ async function login() {
   const { farmer } = await get('https://leekwars.com/api/farmer/get-from-token');
 
   farmerId = farmer.id;
-  leeks = Object.keys(farmer.leeks);
+  leeks = sortBy(Object.keys(farmer.leeks));
 }
 
 async function remainingFights() {
@@ -152,7 +167,7 @@ function sleep(ms) {
     process.exit(0);
   }
 
-  const leek = leeks[0];
+  const leek = leeks[options.leek - 1];
 
   console.log('Getting record...');
   await getRecord(leek);
@@ -212,6 +227,6 @@ function sleep(ms) {
       console.log('We lost.');
     }
 
-    await sleep(1000);
+    await sleep(2500);
   }
 })();
