@@ -9,13 +9,35 @@ const { Option, program } = require('commander');
 const { LOGIN } = process.env;
 const { PASSWORD } = process.env;
 
+function sleep(ms) {
+  // eslint-disable-next-line no-promise-executor-return
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+axios.interceptors.response.use(
+  (response) => response,
+
+  async (error) => {
+    console.log({ error });
+
+    if (error.response?.status === 429) {
+      console.error('Rate limited...');
+      await sleep(2500);
+      return axios.request(error.config);
+    }
+
+    return Promise.reject(error);
+  },
+);
+
 function parseBase10(number) {
   return parseInt(number, 10);
 }
 
 program
   .addOption(new Option('--leek <number>').argParser(parseBase10).default(1))
-  .addOption(new Option('--fights <number>').argParser(parseBase10).default(10));
+  .addOption(new Option('--fights <number>').argParser(parseBase10).default(10))
+  .addOption(new Option('--max-elo').default(false));
 
 program.parse();
 
@@ -50,6 +72,8 @@ function updateRecord(fight, myLeek) {
         record[opponent.id]++;
       } else if (fight.result === 'defeat') {
         record[opponent.id]--;
+      } else {
+        record[opponent.id] -= 0.5;
       }
     }
   }
@@ -140,11 +164,6 @@ async function getResult(fightId) {
   }
 }
 
-function sleep(ms) {
-  // eslint-disable-next-line no-promise-executor-return
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 (async function main() {
   console.log('Logging in...');
   await login();
@@ -155,7 +174,7 @@ function sleep(ms) {
   let fights = await remainingFights();
   console.log(`${fights} remaining fights.`);
   fights = Math.min(fights, options.fights);
-  console.log(`Using ${options.fightsfights} fights.`);
+  console.log(`Using ${options.fights} fights.`);
 
   if (fights === 0) {
     process.exit(0);
@@ -171,7 +190,7 @@ function sleep(ms) {
 
     const sortedEnemies = sortBy(enemies, [
       (enemy) => -(record[enemy.id] ?? 0),
-      (enemy) => enemy.talent,
+      (enemy) => (options.maxElo ? -enemy.talent : enemy.talent),
     ]);
 
     console.log();
@@ -202,11 +221,14 @@ function sleep(ms) {
     }
 
     let us;
+    let them;
 
     if (result.farmers1[farmerId]) {
       us = 1;
+      them = 2;
     } else if (result.farmers2[farmerId]) {
       us = 2;
+      them = 1;
     }
 
     if (!isFinite(record[enemy.id])) {
@@ -216,9 +238,12 @@ function sleep(ms) {
     if (result.winner === us) {
       record[enemy.id]++;
       console.log('We won!');
-    } else {
+    } else if (result.winner === them) {
       record[enemy.id]--;
       console.log('We lost.');
+    } else {
+      record[enemy.id] -= 0.5;
+      console.log('We drew.');
     }
 
     await sleep(2500);
