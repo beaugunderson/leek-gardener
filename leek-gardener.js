@@ -185,6 +185,10 @@ async function getResult(fightId) {
   console.log('Getting record...');
   await getRecord(leek);
 
+  let wins = 0;
+  let losses = 0;
+  let draws = 0;
+
   for (let i = 0; i < fights; i++) {
     const { cookies, enemies } = await getEnemies(leek);
 
@@ -237,15 +241,20 @@ async function getResult(fightId) {
 
     if (result.winner === us) {
       record[enemy.id]++;
+      wins++;
       console.log('We won!');
     } else if (result.winner === them) {
       record[enemy.id]--;
+      losses++;
       console.log('We lost.');
     } else {
       record[enemy.id] -= 0.5;
+      draws++;
       console.log('We drew.');
     }
 
     await sleep(2500);
   }
+
+  console.log(`${wins} wins, ${losses} losses, ${draws} draws.`);
 })();
