@@ -210,7 +210,7 @@ async function getResult(fightId) {
     const enemy = sortedEnemies[0];
 
     console.log();
-    console.log(`Fighting ${enemy.name}...`);
+    console.log(`Fighting ${enemy.name} (${i + 1}/${fights}) [${wins}/${losses}/${draws}]...`);
 
     const { fight } = await startFight(leek, enemy.id, cookies);
 
