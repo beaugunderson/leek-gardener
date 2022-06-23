@@ -9,12 +9,17 @@
   "author": "Beau Gunderson <beau@beaugunderson.com> (https://beaugunderson.com/)",
   "license": "MIT",
   "dependencies": {
+    "@babel/core": "^7.18.5",
     "axios": "^0.27.2",
     "commander": "^9.3.0",
     "dotenv": "^16.0.1",
     "lodash": "^4.17.21"
   },
   "devDependencies": {
+    "@babel/eslint-parser": "^7.18.2",
+    "@babel/eslint-plugin": "^7.17.7",
+    "@babel/plugin-syntax-class-properties": "^7.12.13",
+    "@babel/preset-env": "^7.18.2",
     "eslint": "^8.16.0",
     "eslint-config-airbnb-base": "^15.0.0",
     "eslint-config-prettier": "^8.5.0",
