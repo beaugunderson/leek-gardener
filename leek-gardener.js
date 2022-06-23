@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+/* eslint-disable max-classes-per-file */
+
 require('dotenv').config();
 
 const axios = require('axios');
@@ -37,141 +39,255 @@ function parseBase10(number) {
 program
   .addOption(new Option('--leek <number>').argParser(parseBase10).default(1))
   .addOption(new Option('--fights <number>').argParser(parseBase10).default(10))
-  .addOption(new Option('--max-elo').default(false));
+  .addOption(new Option('--type <type>').default('solo'))
+  .addOption(new Option('--max-elo').default(false))
+  .addOption(new Option('--dry-run').default(false));
 
 program.parse();
 
 const options = program.opts();
 
-let farmerId;
-let leeks;
-
-async function getHistory(leek) {
-  return (await axios.get(`https://leekwars.com/api/history/get-leek-history/${leek}`)).data;
-}
-
-const record = {};
-
-function updateRecord(fight, myLeek) {
-  // ignore team fights for now
-  if (fight.type === 2) {
-    return;
+class Fights {
+  constructor() {
+    this.fightProperties = {};
+    this.record = {};
   }
 
-  const opponentSides = [fight.leeks1, fight.leeks2].filter((side) =>
-    side.every((leek) => leek.id !== myLeek),
-  );
+  async post(url, data) {
+    return (
+      await axios.post(url, data, {
+        headers: {
+          Cookie: `token=${this.token}`,
+          'Content-Type': 'multipart/form-data',
+        },
+      })
+    ).data;
+  }
 
-  for (const side of opponentSides) {
-    for (const opponent of side) {
-      if (!isFinite(record[opponent.id])) {
-        record[opponent.id] = 0;
+  async get(url) {
+    return (await axios.get(url, { headers: { Cookie: `token=${this.token}` } })).data;
+  }
+
+  async login() {
+    const response = await this.post('https://leekwars.com/api/farmer/login-token', {
+      login: LOGIN,
+      password: PASSWORD,
+    });
+
+    this.token = response.token;
+
+    const { farmer } = await this.get('https://leekwars.com/api/farmer/get-from-token');
+
+    this.farmerId = farmer.id;
+    this.leeks = sortBy(Object.keys(farmer.leeks));
+  }
+
+  async remainingFights() {
+    return (await this.get('https://leekwars.com/api/garden/get')).garden.fights;
+  }
+
+  async getEnemies() {
+    const response = await axios.get(this.enemiesUrl, {
+      headers: {
+        Cookie: `token=${this.token}`,
+      },
+    });
+
+    const cookies = response.headers['set-cookie']
+      .map((cookie) => cookie.split('; ')[0])
+      .join('; ');
+
+    const enemies = sortBy(response.data?.opponents ?? [], this.SORT_ENEMIES);
+
+    return {
+      cookies,
+      enemies,
+    };
+  }
+
+  async getResult(fightId) {
+    try {
+      return await this.get(`https://leekwars.com/api/fight/get/${fightId}`);
+    } catch (e) {
+      console.error(e.message);
+      return null;
+    }
+  }
+
+  async startFight(enemy, cookies) {
+    const response = await axios.post(
+      this.fightUrl,
+
+      { ...this.fightParameters, target_id: enemy },
+
+      {
+        headers: {
+          Cookie: cookies,
+          'Content-Type': 'multipart/form-data',
+        },
+      },
+    );
+
+    return response.data;
+  }
+}
+
+class SoloFights extends Fights {
+  SORT_ENEMIES = [
+    (enemy) => -(this.record[enemy.id] ?? 0),
+    (enemy) => (options.maxElo ? -enemy.talent : enemy.talent),
+  ];
+
+  constructor() {
+    super();
+
+    this.leek = this.leeks[options.leek - 1];
+    this.fightParameters = { leek_id: this.leek };
+    this.fightUrl = 'https://leekwars.com/api/garden/start-solo-fight';
+    this.enemiesUrl = `https://leekwars.com/api/garden/get-leek-opponents/${this.leek}`;
+  }
+
+  async getHistory() {
+    return this.get(`https://leekwars.com/api/history/get-leek-history/${this.leek}`);
+  }
+
+  async updateRecord() {
+    const history = await this.getHistory();
+
+    for (const fight of history.fights) {
+      if (fight.type !== 0) {
+        continue;
       }
 
-      if (fight.result === 'win') {
-        record[opponent.id]++;
-      } else if (fight.result === 'defeat') {
-        record[opponent.id]--;
-      } else {
-        record[opponent.id] -= 0.5;
+      const opponentSides = [fight.leeks1, fight.leeks2].filter((side) =>
+        side.every((leek) => leek.id !== this.leek),
+      );
+
+      for (const side of opponentSides) {
+        for (const opponent of side) {
+          if (!isFinite(this.record[opponent.id])) {
+            this.record[opponent.id] = 0;
+          }
+
+          if (fight.result === 'win') {
+            this.record[opponent.id]++;
+          } else if (fight.result === 'defeat') {
+            this.record[opponent.id]--;
+          } else {
+            this.record[opponent.id] -= 0.5;
+          }
+        }
       }
     }
   }
 }
 
-async function getRecord(leek) {
-  const history = await getHistory(leek);
+class FarmerFights extends Fights {
+  SORT_ENEMIES = [
+    (enemy) => -(this.record[enemy.id] ?? 0),
+    (enemy) => (options.maxElo ? -enemy.talent : enemy.talent),
+    (enemy) => enemy.total_level / enemy.leek_count,
+  ];
 
-  for (const fight of history.fights) {
-    updateRecord(fight, leek);
+  enemiesUrl = 'https://leekwars.com/api/garden/get-farmer-opponents';
+
+  fightUrl = 'https://leekwars.com/api/garden/start-farmer-fight';
+
+  async getHistory() {
+    return this.get(`https://leekwars.com/api/history/get-farmer-history/${this.farmerId}`);
+  }
+
+  async updateRecord() {
+    const history = await this.getHistory();
+
+    for (const fight of history.fights) {
+      if (fight.type !== 1) {
+        continue;
+      }
+
+      const opponent = fight.farmer1 === this.farmerId ? fight.farmer2 : fight.farmer1;
+
+      if (!isFinite(this.record[opponent])) {
+        this.record[opponent] = 0;
+      }
+
+      if (fight.result === 'win') {
+        this.record[opponent]++;
+      } else if (fight.result === 'defeat') {
+        this.record[opponent]--;
+      } else {
+        this.record[opponent] -= 0.5;
+      }
+    }
   }
 }
 
-let token;
+class TeamFights extends Fights {
+  // TODO handle compositions
+  SORT_ENEMIES = [
+    (enemy) => -(this.record[enemy.id] ?? 0),
+    (enemy) => (options.maxElo ? -enemy.talent : enemy.talent),
+    (enemy) => (options.maxElo ? -enemy.level : enemy.level),
+    (enemy) => enemy.total_level / enemy.leek_count,
+  ];
 
-async function post(url, data) {
-  return (
-    await axios.post(url, data, {
-      headers: {
-        Cookie: `token=${token}`,
-        'Content-Type': 'multipart/form-data',
-      },
-    })
-  ).data;
-}
+  constructor() {
+    super();
 
-async function get(url) {
-  return (await axios.get(url, { headers: { Cookie: `token=${token}` } })).data;
-}
+    this.compositionId = 26078; // TODO
+    this.teamId = 8876; // TODO
 
-async function login() {
-  const response = await post('https://leekwars.com/api/farmer/login-token', {
-    login: LOGIN,
-    password: PASSWORD,
-  });
+    this.enemiesUrl = `https://leekwars.com/api/garden/get-composition-opponents/${this.compositionId}`;
 
-  token = response.token;
+    this.fightParameters = { composition_id: this.compositionId };
+    this.fightUrl = 'https://leekwars.com/api/garden/start-team-fight';
+  }
 
-  const { farmer } = await get('https://leekwars.com/api/farmer/get-from-token');
+  async getHistory() {
+    return this.get(`https://leekwars.com/api/history/get-team-history/${this.teamId}`);
+  }
 
-  farmerId = farmer.id;
-  leeks = sortBy(Object.keys(farmer.leeks));
-}
+  async updateRecord() {
+    const history = await this.getHistory();
 
-async function remainingFights() {
-  return (await get('https://leekwars.com/api/garden/get')).garden.fights;
-}
+    for (const fight of history.fights) {
+      if (fight.type !== 1) {
+        continue;
+      }
 
-async function getEnemies(leek) {
-  const response = await axios.get(`https://leekwars.com/api/garden/get-leek-opponents/${leek}`, {
-    headers: { Cookie: `token=${token}` },
-  });
+      const opponent = fight.team1 === this.teamId ? fight.team2 : fight.team1;
 
-  const cookies = response.headers['set-cookie'].map((cookie) => cookie.split('; ')[0]).join('; ');
+      if (!isFinite(this.record[opponent])) {
+        this.record[opponent] = 0;
+      }
 
-  return {
-    cookies,
-    enemies: response.data.opponents,
-  };
-}
-
-async function startFight(leek, enemy, cookies) {
-  const response = await axios.post(
-    'https://leekwars.com/api/garden/start-solo-fight',
-
-    {
-      leek_id: leek,
-      target_id: enemy,
-    },
-
-    {
-      headers: {
-        Cookie: cookies,
-        'Content-Type': 'multipart/form-data',
-      },
-    },
-  );
-
-  return response.data;
-}
-
-async function getResult(fightId) {
-  try {
-    return await get(`https://leekwars.com/api/fight/get/${fightId}`);
-  } catch (e) {
-    console.error(e.message);
-    return null;
+      if (fight.result === 'win') {
+        this.record[opponent]++;
+      } else if (fight.result === 'defeat') {
+        this.record[opponent]--;
+      } else {
+        this.record[opponent] -= 0.5;
+      }
+    }
   }
 }
 
-(async function main() {
+const TYPE_MAPPING = {
+  farmer: FarmerFights,
+  solo: SoloFights,
+  team: TeamFights,
+};
+
+(async () => {
+  const manager = new TYPE_MAPPING[options.type]();
+
   console.log('Logging in...');
-  await login();
+  await manager.login();
 
-  console.log(`Logged in as farmer ${farmerId} with leeks ${leeks.join(', ')}.`);
+  console.log(`Logged in as farmer ${manager.farmerId} with leeks ${manager.leeks.join(', ')}.`);
 
   console.log('Getting remaining fights...');
-  let fights = await remainingFights();
+  let fights = await manager.remainingFights();
   console.log(`${fights} remaining fights.`);
   fights = Math.min(fights, options.fights);
   console.log(`Using ${options.fights} fights.`);
@@ -180,75 +296,77 @@ async function getResult(fightId) {
     process.exit(0);
   }
 
-  const leek = leeks[options.leek - 1];
-
   console.log('Getting record...');
-  await getRecord(leek);
+  await manager.updateRecord();
 
   let wins = 0;
   let losses = 0;
   let draws = 0;
 
   for (let i = 0; i < fights; i++) {
-    const { cookies, enemies } = await getEnemies(leek);
-
-    const sortedEnemies = sortBy(enemies, [
-      (enemy) => -(record[enemy.id] ?? 0),
-      (enemy) => (options.maxElo ? -enemy.talent : enemy.talent),
-    ]);
+    const { cookies, enemies } = await manager.getEnemies();
 
     console.log();
 
-    for (const enemy of sortedEnemies) {
+    for (const enemy of enemies) {
       console.log(
         enemy.name.padEnd(20, ' '),
-        `${record[enemy.id] ?? 0}`.padStart(8, ' '),
+        `${manager.record[enemy.id] ?? 0}`.padStart(8, ' '),
         enemy.talent,
+        enemy.total_level
+          ? `${enemy.total_level} / ${enemy.leek_count} (${(
+              enemy.total_level / enemy.leek_count
+            ).toFixed(2)})`
+          : '',
       );
     }
 
-    const enemy = sortedEnemies[0];
+    const enemy = enemies[0];
 
     console.log();
     console.log(`Fighting ${enemy.name} (${i + 1}/${fights}) [${wins}/${losses}/${draws}]...`);
 
-    const { fight } = await startFight(leek, enemy.id, cookies);
+    if (options.dryRun) {
+      continue;
+    }
 
-    let result = await getResult(fight);
+    const { fight } = await manager.startFight(enemy.id, cookies);
+
+    let result = await manager.getResult(fight);
 
     while (!result || result.winner === -1) {
       console.log('Waiting for fight to run...');
 
       await sleep(1000);
 
-      result = await getResult(fight);
+      result = await manager.getResult(fight);
     }
 
     let us;
     let them;
 
-    if (result.farmers1[farmerId]) {
+    if (result.farmers1[manager.farmerId]) {
       us = 1;
       them = 2;
-    } else if (result.farmers2[farmerId]) {
+    } else if (result.farmers2[manager.farmerId]) {
       us = 2;
       them = 1;
     }
 
-    if (!isFinite(record[enemy.id])) {
-      record[enemy.id] = 0;
+    if (!isFinite(manager.record[enemy.id])) {
+      manager.record[enemy.id] = 0;
     }
 
     if (result.winner === us) {
-      record[enemy.id]++;
+      manager.record[enemy.id]++;
       wins++;
       console.log('We won!');
     } else if (result.winner === them) {
-      record[enemy.id]--;
+      manager.record[enemy.id]--;
       losses++;
       console.log('We lost.');
     } else {
-      record[enemy.id] -= 0.5;
+      manager.record[enemy.id] -= 0.5;
       draws++;
       console.log('We drew.');
     }
