@@ -49,7 +49,7 @@ const options = program.opts();
 
 class Fights {
   constructor() {
-    this.fightProperties = {};
+    this.fightParameters = () => ({});
     this.record = {};
   }
 
@@ -79,7 +79,9 @@ class Fights {
     const { farmer } = await this.get('https://leekwars.com/api/farmer/get-from-token');
 
     this.farmerId = farmer.id;
+
     this.leeks = sortBy(Object.keys(farmer.leeks));
+    this.leek = this.leeks[options.leek - 1];
   }
 
   async remainingFights() {
@@ -87,7 +89,7 @@ class Fights {
   }
 
   async getEnemies() {
-    const response = await axios.get(this.enemiesUrl, {
+    const response = await axios.get(this.enemiesUrl(), {
       headers: {
         Cookie: `token=${this.token}`,
       },
@@ -118,7 +120,7 @@ class Fights {
     const response = await axios.post(
       this.fightUrl,
 
-      { ...this.fightParameters, target_id: enemy },
+      { ...this.fightParameters(), target_id: enemy },
 
       {
         headers: {
@@ -141,10 +143,10 @@ class SoloFights extends Fights {
   constructor() {
     super();
 
-    this.leek = this.leeks[options.leek - 1];
-    this.fightParameters = { leek_id: this.leek };
+    this.enemiesUrl = () => `https://leekwars.com/api/garden/get-leek-opponents/${this.leek}`;
+
+    this.fightParameters = () => ({ leek_id: this.leek });
     this.fightUrl = 'https://leekwars.com/api/garden/start-solo-fight';
-    this.enemiesUrl = `https://leekwars.com/api/garden/get-leek-opponents/${this.leek}`;
   }
 
   async getHistory() {
@@ -189,7 +191,9 @@ class FarmerFights extends Fights {
     (enemy) => enemy.total_level / enemy.leek_count,
   ];
 
-  enemiesUrl = 'https://leekwars.com/api/garden/get-farmer-opponents';
+  enemiesUrl() {
+    return 'https://leekwars.com/api/garden/get-farmer-opponents';
+  }
 
   fightUrl = 'https://leekwars.com/api/garden/start-farmer-fight';
 
@@ -237,9 +241,10 @@ class TeamFights extends Fights {
     this.compositionId = 26078; // TODO
     this.teamId = 8876; // TODO
 
-    this.enemiesUrl = `https://leekwars.com/api/garden/get-composition-opponents/${this.compositionId}`;
+    this.enemiesUrl = () =>
+      `https://leekwars.com/api/garden/get-composition-opponents/${this.compositionId}`;
 
-    this.fightParameters = { composition_id: this.compositionId };
+    this.fightParameters = () => ({ composition_id: this.compositionId });
     this.fightUrl = 'https://leekwars.com/api/garden/start-team-fight';
   }
 
