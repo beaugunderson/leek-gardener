@@ -248,6 +248,10 @@ class TeamFights extends Fights {
     this.fightUrl = 'https://leekwars.com/api/garden/start-team-fight';
   }
 
+  async remainingFights() {
+    return (await this.get('https://leekwars.com/api/garden/get')).garden.team_fights;
+  }
+
   async getHistory() {
     return this.get(`https://leekwars.com/api/history/get-team-history/${this.teamId}`);
   }
