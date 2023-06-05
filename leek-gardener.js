@@ -5,8 +5,10 @@
 require('dotenv').config();
 
 const axios = require('axios');
+const { CookieJar } = require('tough-cookie');
 const { isFinite, sortBy } = require('lodash');
 const { Option, program } = require('commander');
+const { wrapper } = require('axios-cookiejar-support');
 
 const { LOGIN } = process.env;
 const { PASSWORD } = process.env;
@@ -16,16 +18,21 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-axios.interceptors.response.use(
+const jar = new CookieJar();
+
+const client = wrapper(axios.create({
+  jar,
+  withCredentials: true
+}));
+
+client.interceptors.response.use(
   (response) => response,
 
   async (error) => {
-    console.log({ error });
-
     if (error.response?.status === 429) {
       console.error('Rate limited...');
       await sleep(2500);
-      return axios.request(error.config);
+      return client.request(error.config);
     }
 
     return Promise.reject(error);
@@ -47,88 +54,119 @@ program.parse();
 
 const options = program.opts();
 
-class Fights {
+async function post(url, data, headers={}) {
+  if (!(data instanceof URLSearchParams)) {
+    // eslint-disable-next-line no-param-reassign
+    headers['Content-Type'] = 'multipart/form-data';
+  }
+
+  return client.post(url, data, { headers });
+}
+
+async function get(url) {
+  return (await client.get(url)).data;
+}
+
+class Connectivity {
+  async login() {
+    try {
+      await post('https://leekwars.com/api/farmer/login-token', {
+        login: LOGIN,
+        password: PASSWORD,
+      });
+
+      const { farmer } = await get('https://leekwars.com/api/farmer/get-from-token');
+
+      this.farmerId = farmer.id;
+
+      this.leeks = sortBy(Object.keys(farmer.leeks));
+      this.leek = this.leeks[options.leek - 1];
+    } catch (e) {
+      console.error('Failed login:', e.toJSON());
+      process.exit(1);
+    }
+  }
+}
+
+class Register extends Connectivity {
+  async main() {
+    for (const leek of this.leeks) {
+      console.log(`Registering "${leek}"...`);
+
+      try {
+        const response = await post(
+          'https://leekwars.com/api/leek/unregister-auto-br',
+          new URLSearchParams({ leek_id: leek }),
+          {
+            Authorization: 'Bearer $',
+            Referer: `https://leekwars.com/leek/${leek}`,
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36',
+            'cache-control': 'no-cache',
+            'pragma': 'no-cache',
+          });
+        console.log(response.data);
+      } catch (e) {
+        console.log('Failed to unregister (probably was not registered)', e.message, e.toJSON());
+        console.log(e.request);
+      }
+
+      await sleep(2000);
+
+      try {
+        const response = await post(
+          'https://leekwars.com/api/leek/register-auto-br',
+          new URLSearchParams({ leek_id: leek }),
+          {
+            Authorization: 'Bearer $',
+            Referer: `https://leekwars.com/leek/${leek}`,
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36',
+            'cache-control': 'no-cache',
+            'pragma': 'no-cache',
+          });
+        console.log(response.data);
+      } catch (e) {
+        console.log('Failed to register', e.message, e.toJSON());
+        console.log(e.request);
+      }
+
+      await sleep(1000);
+    }
+  }
+}
+
+class Fights extends Connectivity {
   constructor() {
+    super()
+
     this.fightParameters = () => ({});
     this.record = {};
   }
 
-  async post(url, data) {
-    return (
-      await axios.post(url, data, {
-        headers: {
-          Cookie: `token=${this.token}`,
-          'Content-Type': 'multipart/form-data',
-        },
-      })
-    ).data;
-  }
-
-  async get(url) {
-    return (await axios.get(url, { headers: { Cookie: `token=${this.token}` } })).data;
-  }
-
-  async login() {
-    const response = await this.post('https://leekwars.com/api/farmer/login-token', {
-      login: LOGIN,
-      password: PASSWORD,
-    });
-
-    this.token = response.token;
-
-    const { farmer } = await this.get('https://leekwars.com/api/farmer/get-from-token');
-
-    this.farmerId = farmer.id;
-
-    this.leeks = sortBy(Object.keys(farmer.leeks));
-    this.leek = this.leeks[options.leek - 1];
-  }
-
   async remainingFights() {
-    return (await this.get('https://leekwars.com/api/garden/get')).garden.fights;
+    return (await get('https://leekwars.com/api/garden/get')).garden.fights;
   }
 
   async getEnemies() {
-    const response = await axios.get(this.enemiesUrl(), {
-      headers: {
-        Cookie: `token=${this.token}`,
-      },
-    });
-
-    const cookies = response.headers['set-cookie']
-      .map((cookie) => cookie.split('; ')[0])
-      .join('; ');
+    const response = await client.get(this.enemiesUrl());
 
     const enemies = sortBy(response.data?.opponents ?? [], this.SORT_ENEMIES);
 
     return {
-      cookies,
       enemies,
     };
   }
 
   async getResult(fightId) {
     try {
-      return await this.get(`https://leekwars.com/api/fight/get/${fightId}`);
+      return await get(`https://leekwars.com/api/fight/get/${fightId}`);
     } catch (e) {
       console.error(e.message);
       return null;
     }
   }
 
-  async startFight(enemy, cookies) {
-    const response = await axios.post(
-      this.fightUrl,
-
-      { ...this.fightParameters(), target_id: enemy },
-
-      {
-        headers: {
-          Cookie: cookies,
-          'Content-Type': 'multipart/form-data',
-        },
-      },
-    );
+  async startFight(enemy) {
+    const response = await post(this.fightUrl, { ...this.fightParameters(), target_id: enemy });
 
     return response.data;
   }
@@ -150,7 +188,7 @@ class SoloFights extends Fights {
   }
 
   async getHistory() {
-    return this.get(`https://leekwars.com/api/history/get-leek-history/${this.leek}`);
+    return get(`https://leekwars.com/api/history/get-leek-history/${this.leek}`);
   }
 
   async updateRecord() {
@@ -198,7 +236,7 @@ class FarmerFights extends Fights {
   fightUrl = 'https://leekwars.com/api/garden/start-farmer-fight';
 
   async getHistory() {
-    return this.get(`https://leekwars.com/api/history/get-farmer-history/${this.farmerId}`);
+    return get(`https://leekwars.com/api/history/get-farmer-history/${this.farmerId}`);
   }
 
   async updateRecord() {
@@ -249,11 +287,11 @@ class TeamFights extends Fights {
   }
 
   async remainingFights() {
-    return (await this.get('https://leekwars.com/api/garden/get')).garden.team_fights;
+    return (await get('https://leekwars.com/api/garden/get')).garden.team_fights;
   }
 
   async getHistory() {
-    return this.get(`https://leekwars.com/api/history/get-team-history/${this.teamId}`);
+    return get(`https://leekwars.com/api/history/get-team-history/${this.teamId}`);
   }
 
   async updateRecord() {
@@ -285,6 +323,7 @@ const TYPE_MAPPING = {
   farmer: FarmerFights,
   solo: SoloFights,
   team: TeamFights,
+  register: Register,
 };
 
 (async () => {
@@ -292,6 +331,11 @@ const TYPE_MAPPING = {
 
   console.log('Logging in...');
   await manager.login();
+
+  if (manager.main) {
+    await manager.main();
+    return;
+  }
 
   console.log(`Logged in as farmer ${manager.farmerId} with leeks ${manager.leeks.join(', ')}.`);
 
@@ -313,7 +357,7 @@ const TYPE_MAPPING = {
   let draws = 0;
 
   for (let i = 0; i < fights; i++) {
-    const { cookies, enemies } = await manager.getEnemies();
+    const { enemies } = await manager.getEnemies();
 
     console.log();
 
@@ -339,7 +383,7 @@ const TYPE_MAPPING = {
       continue;
     }
 
-    const { fight } = await manager.startFight(enemy.id, cookies);
+    const { fight } = await manager.startFight(enemy.id);
 
     let result = await manager.getResult(fight);
 
