@@ -98,6 +98,11 @@ async function login() {
           continue;
         }
 
+        if (!(key in items)) {
+          console.log(`missing key: ${key}`);
+          continue;
+        }
+
         const { name } = items[key];
 
         output[register.key][name] = json[key];
