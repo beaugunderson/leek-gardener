@@ -52,6 +52,7 @@ async function post(url, data, headers = {}) {
 
   return client.post(url, data, { headers });
 }
+
 const MessageTypes = {
   AUTH: 0,
   NOTIFICATION_RECEIVE: 6,
@@ -184,17 +185,17 @@ for (const key of Object.keys(MessageTypes)) {
       const requestId = json[2];
 
       switch (type) {
-        case MessageTypes.GARDEN_BOSS_SQUADS:
-          if (data['1'].length > 0) {
-            for (const squad of data['1']) {
-              if (squad.engaged_count < 8 && squad.locked === false) {
-                send([MessageTypes.GARDEN_BOSS_JOIN_SQUAD, squad.id]);
-                break;
-              }
-            }
-          }
+        // case MessageTypes.GARDEN_BOSS_SQUADS:
+        //   if (data['1'].length > 0) {
+        //     for (const squad of data['1']) {
+        //       if (squad.engaged_count < 8 && squad.locked === false) {
+        //         send([MessageTypes.GARDEN_BOSS_JOIN_SQUAD, squad.id]);
+        //         break;
+        //       }
+        //     }
+        //   }
 
-          break;
+        //   break;
 
         case MessageTypes.LUCKY:
           await sleep(2000);
@@ -204,7 +205,7 @@ for (const key of Object.keys(MessageTypes)) {
           break;
 
         default:
-          console.log(JSON.stringify({ type, data, requestId }, null, 2));
+          console.log(JSON.stringify({ type: TypeFromId[type], data, requestId }, null, 2));
       }
     });
 
@@ -217,7 +218,7 @@ for (const key of Object.keys(MessageTypes)) {
       console.log('open');
 
       send([MessageTypes.BATTLE_ROYALE_REGISTER, 89111]);
-      send([MessageTypes.GARDEN_BOSS_LISTEN]);
+      // send([MessageTypes.GARDEN_BOSS_LISTEN]);
     });
 
     socket.on('error', (err) => {
