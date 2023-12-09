@@ -1,6 +1,5 @@
 #!/bin/bash
 
-/root/.nvm/versions/node/v16.15.0/bin/node ./leek-gardener.js --type register
 /root/.nvm/versions/node/v16.15.0/bin/node ./leek-gardener.js --type team --fights 20
 /root/.nvm/versions/node/v16.15.0/bin/node ./leek-gardener.js --type farmer --fights 50
 
