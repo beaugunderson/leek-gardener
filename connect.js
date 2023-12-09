@@ -19,10 +19,12 @@ function sleep(ms) {
 
 const jar = new CookieJar();
 
-const client = wrapper(axios.create({
-  jar,
-  withCredentials: true
-}));
+const client = wrapper(
+  axios.create({
+    jar,
+    withCredentials: true,
+  }),
+);
 
 client.interceptors.response.use(
   (response) => response,
@@ -42,7 +44,7 @@ async function get(url) {
   return (await client.get(url)).data;
 }
 
-async function post(url, data, headers={}) {
+async function post(url, data, headers = {}) {
   if (!(data instanceof URLSearchParams)) {
     // eslint-disable-next-line no-param-reassign
     headers['Content-Type'] = 'multipart/form-data';
@@ -118,7 +120,7 @@ const MessageTypes = {
   GARDEN_BOSS_LOCK: 80,
   GARDEN_BOSS_UNLISTEN: 81,
   GARDEN_BOSS_LEFT: 82,
-}
+};
 
 const TypeFromId = {};
 
@@ -163,7 +165,7 @@ for (const key of Object.keys(MessageTypes)) {
       process.exit(1);
     }
 
-    console.log({ farmerId, leeks })
+    console.log({ farmerId, leeks });
 
     const cookies = jar.getCookieStringSync('wss://leekwars.com/ws');
 

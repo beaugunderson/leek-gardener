@@ -20,10 +20,12 @@ function sleep(ms) {
 
 const jar = new CookieJar();
 
-const client = wrapper(axios.create({
-  jar,
-  withCredentials: true
-}));
+const client = wrapper(
+  axios.create({
+    jar,
+    withCredentials: true,
+  }),
+);
 
 client.interceptors.response.use(
   (response) => response,
@@ -54,7 +56,7 @@ program.parse();
 
 const options = program.opts();
 
-async function post(url, data, headers={}) {
+async function post(url, data, headers = {}) {
   if (!(data instanceof URLSearchParams)) {
     // eslint-disable-next-line no-param-reassign
     headers['Content-Type'] = 'multipart/form-data';
@@ -120,10 +122,12 @@ class Register extends Connectivity {
           {
             Authorization: 'Bearer $',
             Referer: `https://leekwars.com/leek/${leek}`,
-            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36',
+            'User-Agent':
+              'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36',
             'cache-control': 'no-cache',
-            'pragma': 'no-cache',
-          });
+            pragma: 'no-cache',
+          },
+        );
         console.log('Success', response.data);
       } catch (e) {
         console.log('Failed to register:', e.message);
@@ -136,7 +140,7 @@ class Register extends Connectivity {
 
 class Fights extends Connectivity {
   constructor() {
-    super()
+    super();
 
     this.fightParameters = () => ({});
     this.record = {};
