@@ -1,15 +1,54 @@
 #!/usr/bin/env node
 
+/* eslint-disable no-underscore-dangle */
+
 require('dotenv').config();
 
 const axios = require('axios');
-const { CookieJar } = require('tough-cookie');
-const { wrapper } = require('axios-cookiejar-support');
-const { sortBy } = require('lodash');
 const WebSocket = require('ws');
+const { CookieJar } = require('tough-cookie');
+const { sortBy } = require('lodash');
+const { wrapper } = require('axios-cookiejar-support');
+
+const { openDatabase } = require('./database');
 
 const { LOGIN } = process.env;
 const { PASSWORD } = process.env;
+
+const TABLE_DEFINITION = [
+  `CREATE TABLE IF NOT EXISTS bossJoins (
+    joinTime TEXT,
+    fightId TEXT
+  )`,
+
+  `CREATE INDEX IF NOT EXISTS index_joinTime ON bossJoins(joinTime)`,
+];
+
+const db = openDatabase('./garden.db');
+
+for (const definition of TABLE_DEFINITION) {
+  try {
+    db.prepare(definition).run();
+  } catch (e) {
+    console.error(e.message);
+  }
+}
+
+const _getBossJoinsInLastFourHours = db
+  .prepare(`SELECT COUNT(*) FROM bossJoins WHERE joinTime >= datetime('now', '-4 hours')`)
+  .pluck();
+
+function getBossJoinsInLastFourHours() {
+  return _getBossJoinsInLastFourHours.get();
+}
+
+const _insertBossJoin = db.prepare(
+  `INSERT INTO bossJoins (joinTime, fightId) VALUES (datetime(?), ?)`,
+);
+
+function insertBossJoin(row) {
+  _insertBossJoin.run(row);
+}
 
 function sleep(ms) {
   return new Promise((resolve) => {
@@ -185,17 +224,31 @@ for (const key of Object.keys(MessageTypes)) {
       const requestId = json[2];
 
       switch (type) {
-        // case MessageTypes.GARDEN_BOSS_SQUADS:
-        //   if (data['1'].length > 0) {
-        //     for (const squad of data['1']) {
-        //       if (squad.engaged_count < 8 && squad.locked === false) {
-        //         send([MessageTypes.GARDEN_BOSS_JOIN_SQUAD, squad.id]);
-        //         break;
-        //       }
-        //     }
-        //   }
+        case MessageTypes.GARDEN_BOSS_SQUADS:
+          if (data['1'].length > 0) {
+            for (const squad of data['1']) {
+              if (squad.engaged_count < 8 && squad.locked === false) {
+                // only join at most once per four hours
+                if (getBossJoinsInLastFourHours() > 0) {
+                  return;
+                }
 
-        //   break;
+                console.log(`Joining boss fight "${squad.id}"`);
+
+                // log to database
+                insertBossJoin([new Date().toISOString(), squad.id]);
+
+                // give humans a chance to beat us
+                await sleep(5000);
+
+                send([MessageTypes.GARDEN_BOSS_JOIN_SQUAD, squad.id]);
+
+                break;
+              }
+            }
+          }
+
+          break;
 
         case MessageTypes.LUCKY:
           await sleep(2000);
@@ -205,7 +258,7 @@ for (const key of Object.keys(MessageTypes)) {
           break;
 
         default:
-          console.log(JSON.stringify({ type: TypeFromId[type], data, requestId }, null, 2));
+          console.log(JSON.stringify({ type: TypeFromId[type], data, requestId }));
       }
     });
 
@@ -218,7 +271,7 @@ for (const key of Object.keys(MessageTypes)) {
       console.log('open');
 
       send([MessageTypes.BATTLE_ROYALE_REGISTER, 89111]);
-      // send([MessageTypes.GARDEN_BOSS_LISTEN]);
+      send([MessageTypes.GARDEN_BOSS_LISTEN]);
     });
 
     socket.on('error', (err) => {

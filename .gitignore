@@ -1,2 +1,5 @@
 .env
 screenlog.*
+garden.db
+garden.db-shm
+garden.db-wal
