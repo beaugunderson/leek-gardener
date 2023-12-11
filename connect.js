@@ -305,10 +305,10 @@ async function getFights() {
     });
   }
 
-  await connect();
-
   setInterval(() => {
     send([MessageTypes.BATTLE_ROYALE_REGISTER, 89111]);
     send([MessageTypes.GARDEN_BOSS_LISTEN]);
   }, 1000 * 60 * 5);
+
+  await connect();
 })();
