@@ -250,17 +250,19 @@ async function getFights() {
                   return;
                 }
 
-                console.log(`Joining boss fight "${squad.id}"`);
-
-                // log to database
-                insertBossJoin([new Date().toISOString(), squad.id]);
-
                 const fights = await getFights();
+
+                console.log(`Fights available: ${fights}`);
 
                 if (fights <= 0) {
                   console.log('Not joining because we have no fights');
                   return;
                 }
+
+                console.log(`Joining boss fight "${squad.id}"`);
+
+                // log to database
+                insertBossJoin([new Date().toISOString(), squad.id]);
 
                 // give humans a chance to beat us
                 await sleep(5000);
