@@ -173,6 +173,23 @@ for (const key of Object.keys(MessageTypes)) {
   TypeFromId[MessageTypes[key]] = key;
 }
 
+async function getFights() {
+  try {
+    const { fights } = await get('https://leekwars.com/api/farmer/get-from-token');
+    return fights;
+  } catch (e) {
+    console.log(`Got error "${e.message}", logging in again...`);
+
+    await post('https://leekwars.com/api/farmer/login-token', {
+      login: LOGIN,
+      password: PASSWORD,
+    });
+
+    const { fights } = await get('https://leekwars.com/api/farmer/get-from-token');
+    return fights;
+  }
+}
+
 (async function main() {
   let farmerId;
   let leeks;
@@ -237,6 +254,13 @@ for (const key of Object.keys(MessageTypes)) {
 
                 // log to database
                 insertBossJoin([new Date().toISOString(), squad.id]);
+
+                const fights = await getFights();
+
+                if (fights <= 0) {
+                  console.log('Not joining because we have no fights');
+                  return;
+                }
 
                 // give humans a chance to beat us
                 await sleep(5000);
