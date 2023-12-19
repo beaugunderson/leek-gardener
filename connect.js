@@ -175,8 +175,8 @@ for (const key of Object.keys(MessageTypes)) {
 
 async function getFights() {
   try {
-    const { fights } = await get('https://leekwars.com/api/farmer/get-from-token');
-    return fights;
+    const response = await get('https://leekwars.com/api/farmer/get-from-token');
+    return response?.farmer?.fights;
   } catch (e) {
     console.log(`Got error "${e.message}", logging in again...`);
 
@@ -185,8 +185,8 @@ async function getFights() {
       password: PASSWORD,
     });
 
-    const { fights } = await get('https://leekwars.com/api/farmer/get-from-token');
-    return fights;
+    const response = await get('https://leekwars.com/api/farmer/get-from-token');
+    return response?.farmer?.fights;
   }
 }
 
@@ -203,7 +203,11 @@ async function getFights() {
 
     console.log(`→ ${message}`);
 
-    socket.send(JSON.stringify(message));
+    try {
+      socket.send(JSON.stringify(message));
+    } catch (e) {
+      console.error(e);
+    }
   }
 
   async function connect() {
@@ -294,7 +298,7 @@ async function getFights() {
     });
 
     socket.on('open', () => {
-      console.log('open');
+      console.log('socket open');
 
       // send([MessageTypes.BATTLE_ROYALE_REGISTER, 89111]);
       send([MessageTypes.GARDEN_BOSS_LISTEN]);
