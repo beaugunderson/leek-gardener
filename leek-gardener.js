@@ -92,48 +92,29 @@ class Connectivity {
 
 class Register extends Connectivity {
   async main() {
-    for (const leek of this.leeks) {
-      await this.login();
+    await this.login();
 
-      console.log(`Registering "${leek}"...`);
+    // only one leek can be auto-registered; let's use our best leek
+    const leek = this.leeks[0];
 
-      // try {
-      //   const response = await post(
-      //     'https://leekwars.com/api/leek/unregister-auto-br',
-      //     new URLSearchParams({ leek_id: leek }),
-      //     {
-      //       Authorization: 'Bearer $',
-      //       Referer: `https://leekwars.com/leek/${leek}`,
-      //       'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36',
-      //       'cache-control': 'no-cache',
-      //       'pragma': 'no-cache',
-      //     });
-      //   console.log('Success', response.data);
-      // } catch (e) {
-      //   console.log('Failed to unregister:', e.message);
-      // }
+    console.log(`Registering "${leek}"...`);
 
-      // await sleep(5000);
-
-      try {
-        const response = await post(
-          'https://leekwars.com/api/leek/register-auto-br',
-          new URLSearchParams({ leek_id: leek }),
-          {
-            Authorization: 'Bearer $',
-            Referer: `https://leekwars.com/leek/${leek}`,
-            'User-Agent':
-              'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36',
-            'cache-control': 'no-cache',
-            pragma: 'no-cache',
-          },
-        );
-        console.log('Success', response.data);
-      } catch (e) {
-        console.log('Failed to register:', e.message);
-      }
-
-      await sleep(5000);
+    try {
+      const response = await post(
+        'https://leekwars.com/api/leek/register-auto-br',
+        new URLSearchParams({ leek_id: leek }),
+        {
+          Authorization: 'Bearer $',
+          Referer: `https://leekwars.com/leek/${leek}`,
+          'User-Agent':
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36',
+          'cache-control': 'no-cache',
+          pragma: 'no-cache',
+        },
+      );
+      console.log('Success', response.data);
+    } catch (e) {
+      console.log('Failed to register:', e.message);
     }
   }
 }
