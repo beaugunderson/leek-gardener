@@ -12,8 +12,7 @@ const { wrapper } = require('axios-cookiejar-support');
 
 const { openDatabase } = require('./database');
 
-const { LOGIN } = process.env;
-const { PASSWORD } = process.env;
+const { LOGIN_1, PASSWORD_1 } = process.env;
 
 const TABLE_DEFINITION = [
   `CREATE TABLE IF NOT EXISTS bossJoins (
@@ -181,8 +180,8 @@ async function getFights() {
     console.log(`Got error "${e.message}", logging in again...`);
 
     await post('https://leekwars.com/api/farmer/login-token', {
-      login: LOGIN,
-      password: PASSWORD,
+      login: LOGIN_1,
+      password: PASSWORD_1,
     });
 
     const response = await get('https://leekwars.com/api/farmer/get-from-token');
@@ -213,8 +212,8 @@ async function getFights() {
   async function connect() {
     try {
       await post('https://leekwars.com/api/farmer/login-token', {
-        login: LOGIN,
-        password: PASSWORD,
+        login: LOGIN_1,
+        password: PASSWORD_1,
       });
 
       const { farmer } = await get('https://leekwars.com/api/farmer/get-from-token');

@@ -10,8 +10,7 @@ const { isFinite, sortBy } = require('lodash');
 const { Option, program } = require('commander');
 const { wrapper } = require('axios-cookiejar-support');
 
-const { LOGIN } = process.env;
-const { PASSWORD } = process.env;
+const { LOGIN_1, PASSWORD_1, LOGIN_2, PASSWORD_2 } = process.env;
 
 function sleep(ms) {
   // eslint-disable-next-line no-promise-executor-return
@@ -46,6 +45,7 @@ function parseBase10(number) {
 }
 
 program
+  .addOption(new Option('--login <number>').argParser(parseBase10).default(1))
   .addOption(new Option('--leek <number>').argParser(parseBase10).default(1))
   .addOption(new Option('--fights <number>').argParser(parseBase10).default(10))
   .addOption(new Option('--type <type>').default('solo'))
@@ -71,10 +71,22 @@ async function get(url) {
 
 class Connectivity {
   async login() {
+    let login; let password;
+
+    if (options.login === 1) {
+      login = LOGIN_1;
+      password = PASSWORD_1;
+    } else if (options.login === 2) {
+      login = LOGIN_2;
+      password = PASSWORD_2;
+    } else {
+      throw new Error('--login must be 1 or 2');
+    }
+
     try {
       await post('https://leekwars.com/api/farmer/login-token', {
-        login: LOGIN,
-        password: PASSWORD,
+        login,
+        password,
       });
 
       const { farmer } = await get('https://leekwars.com/api/farmer/get-from-token');

@@ -8,8 +8,7 @@ const { Option, program } = require('commander');
 
 const items = require('./items.json');
 
-const { LOGIN } = process.env;
-const { PASSWORD } = process.env;
+const { LOGIN_1, PASSWORD_1 } = process.env;
 
 function sleep(ms) {
   // eslint-disable-next-line no-promise-executor-return
@@ -64,8 +63,8 @@ async function get(url) {
 
 async function login() {
   const response = await post('https://leekwars.com/api/farmer/login-token', {
-    login: LOGIN,
-    password: PASSWORD,
+    login: LOGIN_1,
+    password: PASSWORD_1,
   });
 
   token = response.token;
