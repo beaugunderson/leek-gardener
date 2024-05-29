@@ -273,8 +273,8 @@ class TeamFights extends Fights {
   constructor() {
     super();
 
-    this.compositionId = 26078; // TODO
-    this.teamId = 8876; // TODO
+    this.compositionId = 27100; // TODO
+    this.teamId = 9481; // TODO
 
     this.enemiesUrl = () =>
       `https://leekwars.com/api/garden/get-composition-opponents/${this.compositionId}`;
